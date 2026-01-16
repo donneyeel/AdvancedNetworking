@@ -31,10 +31,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     socket.read_to_end(&mut data)?;
     // println!("{:x?}", data);
 
-    // Get the total size of the received data in bytes
-    let total_size = data.len();
     // Measure the duration taken for the transmission
     let duration = start.elapsed();
+    // Get the total size of the received data in bytes
+    let total_size = data.len();
+
     // Get the last 8 bytes of the received data as a string
     let last_bytes: String = String::from_utf8_lossy(&data[total_size.saturating_sub(8)..]).to_string();
     
