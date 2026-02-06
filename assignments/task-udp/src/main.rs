@@ -85,19 +85,33 @@ fn transmit_loop(total_size: usize, character: u8) -> Result<u8, Box<dyn Error>>
                 }
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+                println!("!! TIMEOUT !! Retransmitting...");
+            
                 let now = Instant::now();
                 let mut retransmitted = false;
-                
-                for dg in datagrams_unacked.values_mut() {
-                    if now.duration_since(dg.timestamp) > Duration::from_millis(500) {
-                        udp_socket.send_to(&dg.data, &server_addr)?;
-                        dg.timestamp = Instant::now();
-                        retransmitted = true;
+            
+                let mut sorted_packets: Vec<&mut Datagram> = datagrams_unacked.values_mut().collect();
+                sorted_packets.sort_by_key(|d| d.seq);
+            
+                let mut retransmit_limit = 10; 
+            
+                for dg in sorted_packets {
+                    if now.duration_since(dg.timestamp) > Duration::from_millis(1000) {
+                        if retransmit_limit > 0 {
+                            println!("-> Retransmitting SEQ: {}", dg.seq);
+                            udp_socket.send_to(&dg.data, &server_addr)?;
+                            dg.timestamp = Instant::now();
+                            retransmitted = true;
+                            retransmit_limit -= 1;
+                        } else {
+                            break;
+                        }
                     }
                 }
                 
                 if retransmitted {
                     congestion_window = (congestion_window / 2).max(2);
+                    println!("!! Congestion Window reduced to {}", congestion_window);
                 }
             }
             Err(e) => return Err(Box::new(e)),
